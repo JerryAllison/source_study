@@ -119,6 +119,10 @@ BaseServer:
 
 """
 
+"""
+    TCPServer, UDPServer 实现了一个tcp socket server和 udp socket server
+"""
+
 # Author of the BaseServer patch: Luke Kenneth Casson Leighton
 
 # XXX Warning!
@@ -374,6 +378,18 @@ class BaseServer:
         print '-'*40
 
 
+"""
+    这里的实现是，构造器在类被实例化时，会作两个操作，一个是bind，一个是listen，
+    但是它不调用accept方法，只有调用了这个方法后，一个tcp服务器才能够接受客户端的请求，
+    这里把accept方法的调用退后给了在其他地方的调用
+    好处是什么？
+    关于关闭服务器，这里是先调用了socket.shutdown() 再调用socket.close()，这里的目的是明确的
+    关闭数据传输，然后再关闭socket上的读写功能,unp上对close的解释
+    The default action of close with a TCP socket is to mark the socket as closed and return to the
+    process immediately . The socket descriptor is no longer usable by the process: It cannot be used as an 
+    argument to read or write. But, TCP will try to send any data that is already queued to be sent to the
+    other end, and after this occurs, the normal TCP connection termination sequence takes place 
+"""
 class TCPServer(BaseServer):
 
     """Base class for various socket-based server classes.
@@ -428,6 +444,9 @@ class TCPServer(BaseServer):
     request_queue_size = 5
 
     allow_reuse_address = False
+    """
+        server 端的链接创建过程是 socket, bind, listen, accept
+    """
 
     # RequestHandlerClass 是调用程序传递过来的自身实现的方法
     def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True):
@@ -474,6 +493,7 @@ class TCPServer(BaseServer):
         """
         return self.socket.fileno()
 
+    # 返回新的socket和客户端地址
     def get_request(self):
         """Get the request and client address from the socket.
 
@@ -497,6 +517,18 @@ class TCPServer(BaseServer):
         request.close()
 
 
+"""
+    TCP 与 UDP server 的建立过程是完全不同的，可以从unp上得到参考，
+    具体来说，udp socket server 的建立过程只需要 socket(), bind(), recvfrom()就可以了
+    与tcp差异很大，因为它是datagram，无连接协议
+    所以下面的udpserver的实现也是遵照这个原则来的
+    这里因为UDPServer是继承了TCPSever，并且没有自己的构造器，而在TCPSever中，构造器
+    已经完成了socket，bind，操作
+    这里只是改写了get_request()操作，因为tcp和udp是不一样的，tcp的accept，udp这里使用recvfrom()
+    同时还改写了server_activate()，这样就覆盖掉了listen那个操作
+    并且覆盖掉了关闭的操作
+    那为啥不让tcpserver来继承udpserver呢？
+"""
 class UDPServer(TCPServer):
 
     """UDP server class."""
@@ -544,7 +576,7 @@ class ForkingMixIn:
         # above max_children.
         while len(self.active_children) >= self.max_children:
             try:
-                pid, _ = os.waitpid(-1, 0)
+                pid, _ = os.waitpid(-1, 0) # waitpid(pid, options) -> (pid, status) pid 为-1 即为等待any child
                 self.active_children.discard(pid)
             except OSError as e:
                 if e.errno == errno.ECHILD:
@@ -574,9 +606,10 @@ class ForkingMixIn:
 
     def process_request(self, request, client_address):
         """Fork a new subprocess to process the request."""
+        # 产生一个新进程之前，先去清理掉已经结束掉的子进程
         self.collect_children()
         pid = os.fork()
-        if pid:
+        if pid:  # fork()一次，返回两次，给父进程返回子进程id，给子进程返回0
             # Parent process
             if self.active_children is None:
                 self.active_children = set()
