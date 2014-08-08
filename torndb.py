@@ -165,6 +165,8 @@ class Connection(object):
                 itertools.izip: izip(p, q, ...) --> (p[0], q[0]), (p[1], q[1]), ... 
                 利用这个，就可以很方便的组装起来想要拼装的列表或者字典，如果是需要字典，只需要
                 dict(itertools.izip(p,q))
+                这里虽然也可以使用dict()来转换，但是这里却使用了一个重载了字典的 __getattr__的类，
+                好处是在使用这个对象的实例时，才会发生转换？还是说效率高一些？
             """
             return [Row(itertools.izip(column_names, row)) for row in cursor]
         finally:
