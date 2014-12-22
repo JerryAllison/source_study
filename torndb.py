@@ -27,6 +27,9 @@ as torndb.
     查询之类的基本就是老样子，估计是为了接口的完整性，所以简单定义了名字并实现了接口功能
     所以这个接口非常的简单，但是也可以从中学习一下接口的定义过程，虽然实现的功能非常简单
 """
+"""
+    study
+"""
 
 from __future__ import absolute_import, division, with_statement
 
